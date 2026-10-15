@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kodlama Macerası: Yiyecek Peşinde!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #1a1b2e;
+            color: #f8fafc;
+            user-select: none;
+            overflow-x: hidden; 
+            min-height: 100vh;
+        }
+
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            background-color: #334155; 
+            padding: 16px;
+            border-radius: 20px;
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .cell {
+            border-radius: 12px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            aspect-ratio: 1 / 1; 
+            transition: background-color 0.3s ease;
+        }
+
+        .cell-obstacle {
+            background-color: #1e293b; 
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .cell-path {
+            background-color: #f1f5f9; 
+            box-shadow: inset 0 -4px 0 #cbd5e1;
+        }
+
+        .cell-target-bg {
+            background-color: #fef08a; 
+            box-shadow: inset 0 -4px 0 #fde047;
+        }
+        
+        .entity-img {
+            width: 80%;
+            height: 80%;
+            object-fit: contain;
+            position: absolute;
+            z-index: 10;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+            transition: transform 0.2s ease-out;
+        }
+
+        .dir-btn {
+            transition: all 0.1s;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+        }
+        .dir-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+        }
+
+        #code-queue {
+            min-height: 80px;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.02),
+                rgba(255, 255, 255, 0.02) 10px,
+                rgba(255, 255, 255, 0.05) 10px,
+                rgba(255, 255, 255, 0.05) 20px
+            );
+            border: 2px dashed #475569;
+        }
+
+        .code-arrow {
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transition: all 0.2s ease;
+        }
+
+        .active-cmd {
+            transform: scale(1.15);
+            box-shadow: 0 0 15px rgba(255,255,255,0.8);
+            border: 2px solid white;
+            z-index: 20;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 3 Yıldız Performans Animasyonları */
+        .star-pop-1 { animation: starPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0s forwards; opacity: 0; }
+        .star-pop-2 { animation: starPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s forwards; opacity: 0; }
+        .star-pop-3 { animation: starPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.4s forwards; opacity: 0; }
+
+        @keyframes starPop {
+            0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .star-grayscale {
+            filter: grayscale(100%) opacity(30%);
+        }
+
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- 1. ANA MENÜ (TEMA SEÇİMİ) -->
+    <div id="screen-menu" class="absolute inset-0 bg-[#1a1b2e] z-50 flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto">
+        <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 text-center mt-10 md:mt-0">Bir macera seç!</h1>
+        <p class="text-slate-400 mb-10 text-lg md:text-xl text-center">Okları sırala. Hedefe ulaş. Başardığını gör!</p>
+        
+        <div class="flex flex-col md:flex-row gap-6 pb-10">
+            <div onclick="showLevelSelect(0)" class="cursor-pointer group bg-[#23253a] border-2 border-slate-700 hover:border-emerald-400 rounded-3xl p-6 w-72 flex flex-col items-center transition-all hover:-translate-y-2">
+                <div class="h-32 mb-4 flex items-center justify-center">
+                    <img src="images/rakun.png" onerror="this.src='https://placehold.co/120/10b981/FFF?text=RAKUN'" class="h-full object-contain group-hover:scale-110 transition-transform">
+                </div>
+                <h2 class="text-2xl font-bold text-emerald-400 mb-2">Orman Keşfi</h2>
+                <p class="text-slate-400 text-center mb-6 text-sm">Rakunu kodla, fındığa ulaştır!</p>
+                <button class="w-full py-3 bg-emerald-500 text-white font-bold rounded-xl group-hover:bg-emerald-400">Bölümleri Gör</button>
+            </div>
+
+            <div onclick="showLevelSelect(1)" class="cursor-pointer group bg-[#23253a] border-2 border-slate-700 hover:border-orange-400 rounded-3xl p-6 w-72 flex flex-col items-center transition-all hover:-translate-y-2">
+                <div class="h-32 mb-4 flex items-center justify-center relative">
+                    <img src="images/sincap.png" onerror="this.src='https://placehold.co/120/f97316/FFF?text=SINCAP'" class="h-full object-contain group-hover:scale-110 transition-transform relative z-10">
+                </div>
+                <h2 class="text-2xl font-bold text-orange-400 mb-2">Palamut Avı</h2>
+                <p class="text-slate-400 text-center mb-6 text-sm">Sincabı kodla, meşe palamudunu bul!</p>
+                <button class="w-full py-3 bg-orange-500 text-white font-bold rounded-xl group-hover:bg-orange-400">Bölümleri Gör</button>
+            </div>
+
+            <div onclick="showLevelSelect(2)" class="cursor-pointer group bg-[#23253a] border-2 border-slate-700 hover:border-sky-400 rounded-3xl p-6 w-72 flex flex-col items-center transition-all hover:-translate-y-2">
+                <div class="h-32 mb-4 flex items-center justify-center">
+                    <img src="images/maymun.png" onerror="this.src='https://placehold.co/120/38bdf8/FFF?text=MAYMUN'" class="h-full object-contain group-hover:scale-110 transition-transform">
+                </div>
+                <h2 class="text-2xl font-bold text-sky-400 mb-2">Tropikal Ada</h2>
+                <p class="text-slate-400 text-center mb-6 text-sm">Maymunu kodla, hindistan cevizini al!</p>
+                <button class="w-full py-3 bg-sky-500 text-white font-bold rounded-xl group-hover:bg-sky-400">Bölümleri Gör</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. BÖLÜM SEÇME EKRANI -->
+    <div id="screen-levels" class="hidden absolute inset-0 bg-[#1a1b2e] z-40 flex flex-col p-4 md:p-8 overflow-y-auto">
+        <div class="max-w-4xl mx-auto w-full">
+            <div class="flex items-center gap-4 mb-8 mt-4 md:mt-0">
+                <button onclick="returnToMenu()" class="w-12 h-12 rounded-full bg-[#23253a] hover:bg-slate-700 flex shrink-0 items-center justify-center text-xl text-white">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white" id="level-select-title">Macera Adı</h2>
+                    <p class="text-slate-400 text-sm md:text-base mt-1">Oynamak istediğin bölümü seç. En az adımla 3 yıldızı kap!</p>
+                </div>
+            </div>
+
+            <div id="level-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 md:gap-6">
+                <!-- JS ile butonlar buraya eklenecek -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. OYUN EKRANI -->
+    <div id="screen-game" class="hidden flex-1 flex flex-col p-4 md:p-6 max-w-6xl mx-auto w-full">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div class="flex items-center gap-4">
+                <button onclick="returnToLevelSelect()" class="w-12 h-12 rounded-full bg-[#23253a] hover:bg-slate-700 flex shrink-0 items-center justify-center text-xl">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <div>
+                    <p class="text-slate-400 text-xs font-bold tracking-widest uppercase" id="theme-subtitle">İLK ADIMLAR</p>
+                    <h2 class="text-2xl font-bold text-white" id="theme-title">Orman Keşfi</h2>
+                </div>
+            </div>
+            <div class="bg-[#23253a] px-4 py-2 rounded-xl border border-slate-700 flex items-center gap-3">
+                <div class="flex gap-1" id="in-game-stars">
+                    <!-- Oyun içi yıldızlar JS ile eklenecek -->
+                </div>
+                <span class="font-bold text-amber-400" id="level-indicator">Bölüm 1 / 10</span>
+            </div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row flex-1 gap-6 md:gap-8 items-start w-full">
+            
+            <div class="flex-1 w-full bg-[#23253a] p-4 md:p-6 rounded-3xl border border-slate-700/50 flex flex-col items-center">
+                <div class="w-full flex justify-between items-center mb-4 px-2">
+                    <div class="flex items-center gap-2">
+                        <img id="target-icon" src="" class="w-6 h-6 object-contain">
+                        <span class="text-slate-300 font-semibold text-sm md:text-base" id="target-text">Hedef: Fındık</span>
+                    </div>
+                    <span class="text-slate-400 text-xs md:text-sm hidden sm:block">Açık renkli karelerden ilerle.</span>
+                </div>
+                <div id="game-board"></div>
+            </div>
+
+            <div class="w-full lg:w-[400px] flex flex-col gap-6 shrink-0">
+                <div class="bg-[#23253a] p-5 md:p-6 rounded-3xl border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-white">Senin kodun</h3>
+                        <span class="text-slate-400 text-sm" id="step-counter">0 adım</span>
+                    </div>
+                    <p class="text-slate-400 text-sm mb-4">Önce okları sırala, sonra başlat.</p>
+                    
+                    <div id="code-queue" class="rounded-xl flex flex-wrap content-start gap-2 p-4 mb-4"></div>
+                    
+                    <div class="flex justify-between">
+                        <button onclick="removeLastCommand()" class="text-slate-400 hover:text-white text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-rotate-left"></i> Son adımı sil
+                        </button>
+                        <button onclick="clearCommands()" class="text-red-400 hover:text-red-300 text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-trash-can"></i> Temizle
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-[#23253a] p-5 md:p-6 rounded-3xl border border-slate-700">
+                    <h3 class="text-xs font-bold text-slate-400 tracking-wider mb-4 uppercase">HANGİ YÖNE GİDELİM?</h3>
+                    <div class="grid grid-cols-4 gap-2 mb-6">
+                        <button onclick="addCommand('up')" class="dir-btn bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-xl p-3 flex flex-col items-center gap-1">
+                            <i class="fa-solid fa-arrow-up text-xl md:text-2xl"></i><span class="text-[10px] md:text-xs font-bold">Yukarı</span>
+                        </button>
+                        <button onclick="addCommand('down')" class="dir-btn bg-[#14b8a6] hover:bg-[#0d9488] text-white rounded-xl p-3 flex flex-col items-center gap-1">
+                            <i class="fa-solid fa-arrow-down text-xl md:text-2xl"></i><span class="text-[10px] md:text-xs font-bold">Aşağı</span>
+                        </button>
+                        <button onclick="addCommand('left')" class="dir-btn bg-[#f59e0b] hover:bg-[#d97706] text-white rounded-xl p-3 flex flex-col items-center gap-1">
+                            <i class="fa-solid fa-arrow-left text-xl md:text-2xl"></i><span class="text-[10px] md:text-xs font-bold">Sola</span>
+                        </button>
+                        <button onclick="addCommand('right')" class="dir-btn bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl p-3 flex flex-col items-center gap-1">
+                            <i class="fa-solid fa-arrow-right text-xl md:text-2xl"></i><span class="text-[10px] md:text-xs font-bold">Sağa</span>
+                        </button>
+                    </div>
+                    <button id="btn-run" onclick="executeCommands()" class="w-full py-4 bg-[#facc15] hover:bg-[#eab308] text-slate-900 font-extrabold text-lg rounded-xl shadow-[0_4px_0_#ca8a04] active:translate-y-[4px] active:shadow-[0_0px_0_#ca8a04] transition-all flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-play"></i> Başlat
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Başarı Modalı -->
+    <div id="modal-success" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-[#23253a] border-2 border-amber-400 p-8 md:p-10 rounded-3xl flex flex-col items-center text-center w-full max-w-sm transform scale-100 transition-transform shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-10 -right-10 text-9xl opacity-10">🌟</div>
+            <div class="absolute -bottom-10 -left-10 text-9xl opacity-10">🌟</div>
+            
+            <h2 class="text-2xl md:text-3xl font-bold text-white mb-6">Bölüm Tamamlandı!</h2>
+            
+            <!-- Yıldızların Geleceği Alan -->
+            <div class="flex justify-center gap-2 mb-6 h-24" id="modal-stars-container">
+                <!-- JS ile yıldızlar eklenecek -->
+            </div>
+
+            <p class="text-slate-300 mb-8 text-sm md:text-md" id="modal-feedback-text">Harika! En kısa yolu buldun.</p>
+            
+            <div class="flex gap-4 w-full">
+                <button onclick="retryLevel()" class="w-1/3 py-4 bg-slate-600 hover:bg-slate-500 text-white font-bold text-lg rounded-xl shadow-[0_4px_0_#475569] active:translate-y-[4px] active:shadow-[0_0px_0_#475569]">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button onclick="nextLevel()" class="w-2/3 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-lg rounded-xl shadow-[0_4px_0_#059669] active:translate-y-[4px] active:shadow-[0_0px_0_#059669]">
+                    Sonraki
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const themes = [
+            {
+                id: "rakun", title: "Orman Keşfi", subtitle: "İLK ADIMLAR",
+                charImg: "images/rakun.png", targetImg: "images/findik.png", obstacleImg: "images/agac.png", targetName: "Fındık"
+            },
+            {
+                id: "sincap", title: "Palamut Avı", subtitle: "DİKKATLİ İLERLE",
+                charImg: "images/sincap.png", targetImg: "images/mesepalamudu.png", obstacleImg: "images/cali.png", targetName: "Meşe Palamudu"
+            },
+            {
+                id: "maymun", title: "Tropikal Ada", subtitle: "ZORLU YOLLAR",
+                charImg: "images/maymun.png", targetImg: "images/hindistancevizi.png", obstacleImg: "images/kaya.png", targetName: "Hindistan Cevizi"
+            }
+        ];
+
+        const levels = [
+            [ [0,0,0,0], [0,0,0,0], [2,1,3,0], [0,0,0,0] ],
+            [ [0,0,0,0], [0,0,3,0], [2,1,1,0], [0,0,0,0] ],
+            [ [0,0,0,0], [0,1,1,3], [2,1,0,0], [0,0,0,0] ],
+            [ [2,0,0,0], [1,0,3,0], [1,1,1,0], [0,0,0,0] ],
+            [ [0,0,0,0], [2,1,0,0], [0,1,1,0], [0,0,1,3] ],
+            [ [2,1,1,0], [0,0,1,0], [0,0,1,1], [0,0,0,3] ],
+            [ [0,1,1,1], [2,1,0,1], [0,0,0,3], [0,0,0,0] ],
+            [ [0,1,1,0], [2,1,1,3], [0,0,0,0], [0,0,0,0] ],
+            [ [3,1,0,0], [0,1,1,0], [0,0,1,0], [2,1,1,0] ],
+            [ [2,1,1,0], [0,0,1,0], [0,3,1,0], [0,0,0,0] ]
+        ];
+
+        // Performans hesaplaması için her bölümün EN KISA adım sayıları
+        const optimalSteps = [2, 3, 4, 5, 5, 6, 6, 3, 7, 5];
+
+        // Öğrenci İlerlemesini Tutma (Tarayıcı hafızası)
+        // Artık true/false yerine kazanılan yıldız sayısını (0,1,2,3) tutuyoruz.
+        let userProgress = JSON.parse(localStorage.getItem('solvoKidsStarProgress')) || {
+            0: Array(10).fill(0), 1: Array(10).fill(0), 2: Array(10).fill(0)
+        };
+
+        function saveProgress() {
+            localStorage.setItem('solvoKidsStarProgress', JSON.stringify(userProgress));
+        }
+
+        let currentThemeIndex = 0;
+        let currentLevelIndex = 0;
+        let commands = [];
+        let isExecuting = false;
+        let charPos = { row: 0, col: 0 };
+        let startPos = { row: 0, col: 0 };
+
+        const boardEl = document.getElementById('game-board');
+        const queueEl = document.getElementById('code-queue');
+        const stepEl = document.getElementById('step-counter');
+        const btnRun = document.getElementById('btn-run');
+
+        const dirIcons = {
+            'up': '<i class="fa-solid fa-arrow-up text-white"></i>',
+            'down': '<i class="fa-solid fa-arrow-down text-white"></i>',
+            'left': '<i class="fa-solid fa-arrow-left text-white"></i>',
+            'right': '<i class="fa-solid fa-arrow-right text-white"></i>'
+        };
+        const dirColors = {
+            'up': 'bg-[#8b5cf6]', 'down': 'bg-[#14b8a6]', 'left': 'bg-[#f59e0b]', 'right': 'bg-[#3b82f6]'
+        };
+
+        function showLevelSelect(themeIndex) {
+            currentThemeIndex = themeIndex;
+            document.getElementById('screen-menu').classList.add('hidden');
+            document.getElementById('screen-game').classList.add('hidden');
+            document.getElementById('screen-levels').classList.remove('hidden');
+
+            document.getElementById('level-select-title').innerText = themes[themeIndex].title;
+            
+            const grid = document.getElementById('level-grid');
+            grid.innerHTML = '';
+
+            for (let i = 0; i < 10; i++) {
+                const earnedStars = userProgress[themeIndex][i];
+                const isUnlocked = i === 0 || userProgress[themeIndex][i-1] > 0 || earnedStars > 0;
+
+                const btn = document.createElement('button');
+                btn.className = `aspect-square rounded-3xl border-2 flex flex-col items-center justify-center transition-all relative overflow-hidden ${
+                    isUnlocked 
+                    ? 'bg-[#23253a] border-slate-600 hover:border-emerald-400 hover:-translate-y-1 cursor-pointer' 
+                    : 'bg-slate-800/50 border-slate-800 cursor-not-allowed opacity-60'
+                }`;
+
+                const num = document.createElement('span');
+                num.className = `text-3xl font-bold mb-2 ${isUnlocked ? 'text-white' : 'text-slate-600'}`;
+                num.innerText = i + 1;
+                btn.appendChild(num);
+
+                const starContainer = document.createElement('div');
+                starContainer.className = 'flex gap-1 justify-center w-full px-2';
+                
+                if (!isUnlocked) {
+                    starContainer.innerHTML = '<i class="fa-solid fa-lock text-slate-600 text-xl"></i>';
+                } else {
+                    // 3 Yıldızı Çiz
+                    for (let s = 1; s <= 3; s++) {
+                        const starImg = document.createElement('img');
+                        starImg.src = 'images/yildiz.png';
+                        // Eğer bu yıldızı kazanamadıysa gri yap
+                        starImg.className = `w-5 h-5 md:w-6 md:h-6 object-contain ${s <= earnedStars ? 'drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]' : 'star-grayscale'}`;
+                        starImg.onerror = function() { this.src = 'https://placehold.co/40/facc15/000?text=Y'; };
+                        starContainer.appendChild(starImg);
+                    }
+                }
+                
+                btn.appendChild(starContainer);
+
+                if (isUnlocked) {
+                    btn.onclick = () => startSpecificLevel(themeIndex, i);
+                }
+
+                grid.appendChild(btn);
+            }
+        }
+
+        function returnToMenu() {
+            document.getElementById('screen-levels').classList.add('hidden');
+            document.getElementById('screen-menu').classList.remove('hidden');
+        }
+
+        function returnToLevelSelect() {
+            document.getElementById('screen-game').classList.add('hidden');
+            showLevelSelect(currentThemeIndex); 
+        }
+
+        function startSpecificLevel(themeIndex, levelIndex) {
+            currentThemeIndex = themeIndex;
+            currentLevelIndex = levelIndex;
+            
+            const theme = themes[themeIndex];
+            document.getElementById('theme-title').innerText = theme.title;
+            document.getElementById('theme-subtitle').innerText = theme.subtitle;
+            document.getElementById('target-text').innerText = "Hedef: " + theme.targetName;
+            document.getElementById('target-icon').src = theme.targetImg;
+            
+            document.getElementById('screen-levels').classList.add('hidden');
+            document.getElementById('screen-game').classList.remove('hidden');
+            loadLevel();
+        }
+
+        function loadLevel() {
+            isExecuting = false;
+            btnRun.disabled = false;
+            btnRun.classList.remove('opacity-50');
+            
+            commands = [];
+            updateCommandUI();
+            
+            document.getElementById('level-indicator').innerText = `Bölüm ${currentLevelIndex + 1} / 10`;
+            
+            // Oyun içi üst bar yıldızları
+            const inGameStars = document.getElementById('in-game-stars');
+            inGameStars.innerHTML = '';
+            const earnedStars = userProgress[currentThemeIndex][currentLevelIndex];
+            for (let s = 1; s <= 3; s++) {
+                const starImg = document.createElement('img');
+                starImg.src = 'images/yildiz.png';
+                starImg.className = `w-4 h-4 object-contain ${s <= earnedStars ? '' : 'star-grayscale'}`;
+                starImg.onerror = function() { this.style.display = 'none'; };
+                inGameStars.appendChild(starImg);
+            }
+
+            const layout = levels[currentLevelIndex];
+            const theme = themes[currentThemeIndex];
+            
+            boardEl.innerHTML = '';
+
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const val = layout[r][c];
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    if (val === 0) {
+                        cell.classList.add('cell-obstacle');
+                        const obsImg = document.createElement('img');
+                        obsImg.src = theme.obstacleImg;
+                        obsImg.className = 'w-3/4 h-3/4 object-contain opacity-70';
+                        obsImg.onerror = function() { this.src = 'https://placehold.co/80/1e293b/FFF?text=ENGEL' };
+                        cell.appendChild(obsImg);
+                    } else if (val === 3) {
+                        cell.classList.add('cell-target-bg');
+                        const targetImg = document.createElement('img');
+                        targetImg.src = theme.targetImg;
+                        targetImg.className = 'entity-img target-item';
+                        targetImg.onerror = function() { this.src = 'https://placehold.co/80/fef08a/000?text=HEDEF' };
+                        cell.appendChild(targetImg);
+                    } else {
+                        cell.classList.add('cell-path');
+                    }
+
+                    if (val === 2) {
+                        startPos = { row: r, col: c };
+                    }
+                    boardEl.appendChild(cell);
+                }
+            }
+            
+            charPos = { ...startPos };
+            createCharacter(startPos.row, startPos.col);
+        }
+
+        function createCharacter(row, col) {
+            const oldChar = document.getElementById('player-char');
+            if(oldChar) oldChar.remove();
+
+            const theme = themes[currentThemeIndex];
+            const charImg = document.createElement('img');
+            charImg.id = 'player-char';
+            charImg.src = theme.charImg;
+            charImg.className = 'entity-img drop-shadow-xl z-20';
+            charImg.onerror = function() { this.src = 'https://placehold.co/80/FFF/000?text=KRT' };
+            
+            const startCell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+            if (startCell) {
+                startCell.appendChild(charImg);
+            }
+        }
+
+        function addCommand(dir) {
+            if (isExecuting) return;
+            commands.push(dir);
+            updateCommandUI();
+        }
+
+        function removeLastCommand() {
+            if (isExecuting || commands.length === 0) return;
+            commands.pop();
+            updateCommandUI();
+        }
+
+        function clearCommands() {
+            if (isExecuting) return;
+            commands = [];
+            updateCommandUI();
+            
+            charPos = { ...startPos };
+            createCharacter(startPos.row, startPos.col);
+            
+            document.querySelectorAll('.bg-red-400').forEach(el => {
+                el.classList.remove('bg-red-400');
+                el.classList.add('cell-path');
+            });
+        }
+
+        function updateCommandUI() {
+            queueEl.innerHTML = '';
+            commands.forEach((cmd, idx) => {
+                const box = document.createElement('div');
+                box.className = `code-arrow w-8 h-8 rounded flex items-center justify-center text-sm ${dirColors[cmd]}`;
+                box.innerHTML = dirIcons[cmd];
+                box.dataset.index = idx;
+                if(idx === commands.length - 1) box.style.animationDelay = '0s';
+                else box.style.animation = 'none';
+                queueEl.appendChild(box);
+            });
+            
+            stepEl.innerText = `${commands.length} adım`;
+            if(commands.length === 0) {
+                 queueEl.innerHTML = '<div class="w-full text-center text-slate-500 text-sm md:text-base mt-2"><i class="fa-solid fa-arrows-left-right mb-1"></i><br>Okların burada görünecek.</div>';
+            }
+        }
+
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        async function executeCommands() {
+            if (commands.length === 0 || isExecuting) return;
+            
+            isExecuting = true;
+            btnRun.disabled = true;
+            btnRun.classList.add('opacity-50');
+            
+            charPos = { ...startPos };
+            createCharacter(startPos.row, startPos.col);
+            
+            const layout = levels[currentLevelIndex];
+            let crashed = false;
+
+            const arrows = document.querySelectorAll('.code-arrow');
+
+            await delay(400);
+
+            for (let i = 0; i < commands.length; i++) {
+                arrows.forEach(el => el.classList.remove('active-cmd'));
+                if (arrows[i]) arrows[i].classList.add('active-cmd');
+
+                const cmd = commands[i];
+                let nextRow = charPos.row;
+                let nextCol = charPos.col;
+
+                if (cmd === 'up') nextRow--;
+                if (cmd === 'down') nextRow++;
+                if (cmd === 'left') nextCol--;
+                if (cmd === 'right') nextCol++;
+
+                if (nextRow < 0 || nextRow >= 4 || nextCol < 0 || nextCol >= 4 || layout[nextRow][nextCol] === 0) {
+                    crashed = true;
+                    await moveCharacterTo(nextRow, nextCol, true);
+                    break; 
+                } else {
+                    charPos.row = nextRow;
+                    charPos.col = nextCol;
+                    await moveCharacterTo(nextRow, nextCol, false);
+                }
+                
+                await delay(500); 
+            }
+
+            arrows.forEach(el => el.classList.remove('active-cmd'));
+
+            if (!crashed && layout[charPos.row][charPos.col] === 3) {
+                // YILDIZ HESAPLAMA
+                const optSteps = optimalSteps[currentLevelIndex];
+                const usedSteps = commands.length;
+                let starsEarned = 1;
+
+                if (usedSteps <= optSteps) {
+                    starsEarned = 3; // En kısa yol
+                } else if (usedSteps <= optSteps + 2) {
+                    starsEarned = 2; // Fena değil, 1-2 fazla blok
+                }
+
+                // Eski skordan daha iyiyse kaydet
+                if (starsEarned > userProgress[currentThemeIndex][currentLevelIndex]) {
+                    userProgress[currentThemeIndex][currentLevelIndex] = starsEarned;
+                    saveProgress();
+                }
+
+                // Modalı hazırla
+                const modalStarsContainer = document.getElementById('modal-stars-container');
+                modalStarsContainer.innerHTML = '';
+                
+                let feedbackText = "";
+                if(starsEarned === 3) feedbackText = "Kusursuz! En kısa yolu buldun.";
+                else if(starsEarned === 2) feedbackText = "Tebrikler! Belki 1-2 adım daha kısaltabilirsin.";
+                else feedbackText = "Başardın! Ama yolu biraz uzattın, daha kestirme bir yol var mıdır?";
+                
+                document.getElementById('modal-feedback-text').innerText = feedbackText;
+
+                for(let s = 1; s <= 3; s++) {
+                    const starImg = document.createElement('img');
+                    starImg.src = 'images/yildiz.png';
+                    
+                    if(s <= starsEarned) {
+                        starImg.className = `w-16 h-16 md:w-20 md:h-20 object-contain star-pop-${s} drop-shadow-[0_0_15px_rgba(250,204,21,0.8)]`;
+                    } else {
+                        starImg.className = `w-16 h-16 md:w-20 md:h-20 object-contain star-grayscale`;
+                    }
+                    starImg.onerror = function() { this.src = 'https://placehold.co/80/facc15/000?text=Y'; };
+                    modalStarsContainer.appendChild(starImg);
+                }
+
+                const charEl = document.getElementById('player-char');
+                charEl.style.transform = 'scale(1.2) rotate(10deg)';
+                await delay(300);
+                charEl.style.transform = 'scale(1) rotate(-10deg)';
+                await delay(200);
+                charEl.style.transform = 'scale(1) rotate(0deg)';
+                await delay(200);
+                
+                document.getElementById('modal-success').classList.remove('hidden');
+            } else {
+                setTimeout(() => {
+                    alert("Hedefe ulaşamadık. Kodunu gözden geçirip tekrar dene!");
+                    isExecuting = false;
+                    btnRun.disabled = false;
+                    btnRun.classList.remove('opacity-50');
+                    clearCommands();
+                }, 400);
+            }
+        }
+
+        function moveCharacterTo(row, col, isCrash) {
+            return new Promise(resolve => {
+                const charEl = document.getElementById('player-char');
+                let targetCell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+                
+                if (isCrash && !targetCell) {
+                    charEl.style.transform = 'translate(10px, 10px) rotate(15deg)';
+                    setTimeout(() => { charEl.style.transform = 'none'; resolve(); }, 350);
+                    return;
+                }
+
+                if (isCrash && targetCell) {
+                    targetCell.classList.remove('cell-path');
+                    targetCell.classList.add('bg-red-400');
+                    charEl.style.transform = 'rotate(-25deg)';
+                    setTimeout(() => { resolve(); }, 300);
+                    return;
+                }
+
+                targetCell.appendChild(charEl);
+                resolve();
+            });
+        }
+
+        function retryLevel() {
+            document.getElementById('modal-success').classList.add('hidden');
+            loadLevel();
+        }
+
+        function nextLevel() {
+            document.getElementById('modal-success').classList.add('hidden');
+            
+            if (currentLevelIndex < 9) {
+                currentLevelIndex++;
+                loadLevel();
+            } else {
+                alert("Tebrikler! Bu maceradaki tüm bölümleri bitirdin!");
+                returnToLevelSelect();
+            }
+        }
+
+        updateCommandUI();
+    </script>
+</body>
+</html>
